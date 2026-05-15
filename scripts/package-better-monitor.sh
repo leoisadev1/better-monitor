@@ -30,6 +30,10 @@ if [[ -f "$APP_ICON" ]]; then
     cp "$APP_ICON" "$RESOURCES_DIR/AppIcon.icns"
 fi
 
+if command -v install_name_tool >/dev/null 2>&1; then
+    install_name_tool -add_rpath "@executable_path/../Frameworks" "$MACOS_DIR/$APP_NAME" 2>/dev/null || true
+fi
+
 while IFS= read -r framework; do
     framework_name="$(basename "$framework")"
     rm -rf "$FRAMEWORKS_DIR/$framework_name"
