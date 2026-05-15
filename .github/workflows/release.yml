@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, for example 0.1.4. Leave empty to bump the latest patch tag."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, test, and publish release
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          requested="${{ inputs.version }}"
+          if [[ -n "$requested" ]]; then
+            version="$requested"
+          else
+            latest="$(git tag --list 'v[0-9]*' --sort=-v:refname | head -1 || true)"
+            if [[ -z "$latest" ]]; then
+              version="$(cat VERSION)"
+            else
+              raw="${latest#v}"
+              IFS=. read -r major minor patch <<< "$raw"
+              version="$major.$minor.$((patch + 1))"
+            fi
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "build=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: swift test
+
+      - name: Probe sampler budget
+        run: scripts/probe-sampler.sh
+
+      - name: Build release artifacts
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          TAG_NAME: ${{ steps.version.outputs.tag }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          run: scripts/make-release-artifacts.sh
+
+      - name: Verify app bundle signature
+        run: codesign --verify --deep --strict --verbose=2 "dist/Better Monitor.app"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Release $TAG_NAME already exists; refusing to overwrite it."
+            exit 1
+          fi
+          gh release create "$TAG_NAME" \
+            "dist/Better-Monitor-$VERSION.zip" \
+            "dist/appcast.xml" \
+            --title "Better Monitor $VERSION" \
+            --notes-file "dist/release-notes.md"
