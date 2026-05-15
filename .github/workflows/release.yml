@@ -65,7 +65,7 @@ jobs:
           BUILD_NUMBER: ${{ steps.version.outputs.build }}
           TAG_NAME: ${{ steps.version.outputs.tag }}
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-          run: scripts/make-release-artifacts.sh
+        run: scripts/make-release-artifacts.sh
 
       - name: Verify app bundle signature
         run: codesign --verify --deep --strict --verbose=2 "dist/Better Monitor.app"
