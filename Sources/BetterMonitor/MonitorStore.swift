@@ -536,8 +536,8 @@ final class MonitorStore {
 
     private func preventingSleepRank(_ value: Bool?) -> Int {
         switch value {
-        case true: 2
-        case false: 1
+        case .some(true): 2
+        case .some(false): 1
         case nil: 0
         }
     }
