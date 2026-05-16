@@ -160,8 +160,8 @@ import Testing
     #expect(ProcessColumnValue.string(for: .name, process: process) == "Better Monitor")
     #expect(ProcessColumnValue.string(for: .pid, process: process) == "123")
     #expect(ProcessColumnValue.string(for: .cpu, process: process) == "12.5%")
-    #expect(ProcessColumnValue.string(for: .diskRead, process: process).contains("KB"))
-    #expect(ProcessColumnValue.string(for: .diskWritten, process: process).contains("KB"))
+    #expect(ProcessColumnValue.string(for: .diskRead, process: process).contains("/s"))
+    #expect(ProcessColumnValue.string(for: .diskWritten, process: process).contains("/s"))
     #expect(ProcessColumnValue.string(for: .networkReceived, process: process).contains("KB"))
     #expect(ProcessColumnValue.string(for: .networkSent, process: process).contains("KB"))
     #expect(ProcessColumnValue.string(for: .threads, process: process) == "1")
@@ -520,6 +520,41 @@ import Testing
 
     #expect(output.contains("Executable Path:"))
     #expect(output.contains("better-monitorPackageTests"))
+}
+
+@Test func energyImpactUsesLiveResourceRatesInsteadOfCumulativeTotals() async throws {
+    let first = SystemMonitorSampler.energyImpact(
+        cpuPercent: 2,
+        memoryPercent: 5,
+        counters: ProcessResourceCounters(readBytes: 0, writtenBytes: 0, energyNanojoules: 9_000_000_000_000, wakeups: 10_000_000),
+        previousCounters: nil,
+        elapsedSeconds: nil
+    )
+    let second = SystemMonitorSampler.energyImpact(
+        cpuPercent: 2,
+        memoryPercent: 5,
+        counters: ProcessResourceCounters(readBytes: 0, writtenBytes: 0, energyNanojoules: 9_001_000_000_000, wakeups: 10_000_250),
+        previousCounters: ProcessResourceCounters(readBytes: 0, writtenBytes: 0, energyNanojoules: 9_000_000_000_000, wakeups: 10_000_000),
+        elapsedSeconds: 2
+    )
+
+    #expect(first < 5)
+    #expect(second > first)
+    #expect(second < 10)
+}
+
+@Test func energyPaneReportsBoundedLiveImpact() async throws {
+    let sampler = SystemMonitorSampler()
+    _ = await sampler.capture(focusedPane: .energy, focusedScope: .all)
+    try? await Task.sleep(for: .milliseconds(160))
+
+    let snapshot = await sampler.capture(focusedPane: .energy, focusedScope: .all)
+    let impacts = snapshot.processes.map(\.energyImpact)
+
+    #expect(!impacts.isEmpty)
+    #expect(impacts.allSatisfy { $0 >= 0 && $0 <= 100 })
+    #expect(snapshot.summary.energy.averageImpact >= 0)
+    #expect(snapshot.summary.energy.averageImpact <= 100)
 }
 
 @Test func hostCPUReaderComputesDeltaPercentages() async throws {

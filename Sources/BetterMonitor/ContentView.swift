@@ -615,13 +615,13 @@ private struct ProcessRow: View {
             Text(String(format: "%.1f", process.energyImpact))
                 .monospacedDigit()
         case .disk:
-            Text(MonitorFormatting.bytes(process.diskReadBytes + process.diskWriteBytes))
+            Text(MonitorFormatting.rate(process.diskReadBytes + process.diskWriteBytes))
                 .monospacedDigit()
         case .diskRead:
-            Text(MonitorFormatting.bytes(process.diskReadBytes))
+            Text(MonitorFormatting.rate(process.diskReadBytes))
                 .monospacedDigit()
         case .diskWritten:
-            Text(MonitorFormatting.bytes(process.diskWriteBytes))
+            Text(MonitorFormatting.rate(process.diskWriteBytes))
                 .monospacedDigit()
         case .network:
             Text(MonitorFormatting.bytes(process.networkReceivedBytes + process.networkSentBytes))

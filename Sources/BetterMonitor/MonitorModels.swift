@@ -156,9 +156,9 @@ enum ProcessSortKey: String, CaseIterable, Identifiable {
         case .cpu: "% CPU"
         case .memory: "Memory"
         case .energy: "Energy Impact"
-        case .disk: "Disk"
-        case .diskRead: "Bytes Read"
-        case .diskWritten: "Bytes Written"
+        case .disk: "Disk/s"
+        case .diskRead: "Read/s"
+        case .diskWritten: "Write/s"
         case .network: "Network"
         case .networkReceived: "Received Bytes"
         case .networkSent: "Sent Bytes"
@@ -166,7 +166,7 @@ enum ProcessSortKey: String, CaseIterable, Identifiable {
         case .threads: "Threads"
         case .ports: "Ports"
         case .preventingSleep: "Preventing Sleep"
-        case .wakeups: "Wakeups"
+        case .wakeups: "Wakeups/s"
         case .cpuTime: "CPU Time"
         }
     }
@@ -202,9 +202,9 @@ enum ProcessColumn: String, CaseIterable, Identifiable {
         case .cpu: "% CPU"
         case .memory: "Memory"
         case .energy: "Energy Impact"
-        case .disk: "Disk"
-        case .diskRead: "Bytes Read"
-        case .diskWritten: "Bytes Written"
+        case .disk: "Disk/s"
+        case .diskRead: "Read/s"
+        case .diskWritten: "Write/s"
         case .network: "Network"
         case .networkReceived: "Received Bytes"
         case .networkSent: "Sent Bytes"
@@ -212,7 +212,7 @@ enum ProcessColumn: String, CaseIterable, Identifiable {
         case .threads: "Threads"
         case .ports: "Ports"
         case .preventingSleep: "Preventing Sleep"
-        case .wakeups: "Wakeups"
+        case .wakeups: "Wakeups/s"
         case .cpuTime: "CPU Time"
         }
     }

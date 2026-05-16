@@ -23,11 +23,15 @@ extension MonitorSampling {
 actor SystemMonitorSampler: MonitorSampling {
     private var previousCPUTicks: HostCPUTicks?
     private var previousProcessCPUTimes: [Int32: UInt64] = [:]
+    private var previousProcessResourceCounters: [Int32: ProcessResourceCounters] = [:]
     private var previousProcessCaptureDate: Date?
+    private var previousProcessResourceCaptureDate: Date?
 
     func capture(focusedPane: MonitorPane, focusedScope: ProcessScope) async -> MonitorSnapshot {
         let processCPUTimes = previousProcessCPUTimes
+        let processResourceCounters = previousProcessResourceCounters
         let processCaptureDate = previousProcessCaptureDate
+        let processResourceCaptureDate = previousProcessResourceCaptureDate
         let raw = await Task.detached(priority: .utility) {
             let capturedAt = Date()
             let networkByPID = focusedPane == .network ? PerProcessNetworkParser.capture() : [:]
@@ -39,13 +43,16 @@ actor SystemMonitorSampler: MonitorSampling {
                 visibleWindowPIDs: visibleWindowPIDs,
                 includeResourceUsage: focusedPane.needsResourceUsageCounters,
                 previousCPUTimes: processCPUTimes,
+                previousResourceCounters: processResourceCounters,
                 previousCaptureDate: processCaptureDate,
+                previousResourceCaptureDate: processResourceCaptureDate,
                 capturedAt: capturedAt
             )
             return RawCapture(
                 capturedAt: capturedAt,
                 processes: processCapture.processes,
                 processCPUTimes: processCapture.cpuTimes,
+                processResourceCounters: processCapture.resourceCounters,
                 cpuTicks: HostCPUReader.readTicks(),
                 memory: Self.captureMemory(processes: processCapture.processes, detailed: true),
                 energy: Self.captureEnergy(processes: processCapture.processes, sleepPreventingPIDs: sleepPreventingPIDs),
@@ -58,6 +65,10 @@ actor SystemMonitorSampler: MonitorSampling {
         let cpu = Self.captureCPU(processes: raw.processes, currentTicks: raw.cpuTicks, previousTicks: previousCPUTicks)
         previousCPUTicks = raw.cpuTicks
         previousProcessCPUTimes = raw.processCPUTimes
+        if !raw.processResourceCounters.isEmpty {
+            previousProcessResourceCounters = raw.processResourceCounters
+            previousProcessResourceCaptureDate = raw.capturedAt
+        }
         previousProcessCaptureDate = raw.capturedAt
 
         return MonitorSnapshot(
@@ -78,6 +89,7 @@ actor SystemMonitorSampler: MonitorSampling {
         let capturedAt: Date
         let processes: [ProcessSnapshot]
         let processCPUTimes: [Int32: UInt64]
+        let processResourceCounters: [Int32: ProcessResourceCounters]
         let cpuTicks: HostCPUTicks?
         let memory: MemorySummary
         let energy: EnergySummary
@@ -89,6 +101,7 @@ actor SystemMonitorSampler: MonitorSampling {
     private struct ProcessCapture: Sendable {
         let processes: [ProcessSnapshot]
         let cpuTimes: [Int32: UInt64]
+        let resourceCounters: [Int32: ProcessResourceCounters]
     }
 
     private static func captureProcesses(
@@ -97,14 +110,18 @@ actor SystemMonitorSampler: MonitorSampling {
         visibleWindowPIDs: Set<Int32>,
         includeResourceUsage: Bool,
         previousCPUTimes: [Int32: UInt64],
+        previousResourceCounters: [Int32: ProcessResourceCounters],
         previousCaptureDate: Date?,
+        previousResourceCaptureDate: Date?,
         capturedAt: Date
     ) -> ProcessCapture {
         let infos = ProcessInfoSampler.allBSDInfos()
         var userCache: [uid_t: String] = [:]
         var cpuTimes: [Int32: UInt64] = [:]
+        var resourceCounters: [Int32: ProcessResourceCounters] = [:]
         let physicalMemory = max(1, Double(ProcessInfo.processInfo.physicalMemory))
         let elapsedNanoseconds = previousCaptureDate.map { max(0.001, capturedAt.timeIntervalSince($0)) * 1_000_000_000 }
+        let elapsedResourceSeconds = previousResourceCaptureDate.map { max(0.001, capturedAt.timeIntervalSince($0)) }
         let processes = infos.compactMap { bsd -> ProcessSnapshot? in
             let pid = bsd.pid
             guard let task = ProcessInfoSampler.taskInfo(pid: pid)
@@ -127,8 +144,21 @@ actor SystemMonitorSampler: MonitorSampling {
             let memoryBytes = rusage?.physicalFootprintBytes ?? task.residentMemoryBytes
             let memoryPercent = Double(memoryBytes) / physicalMemory * 100
             let network = networkByPID[pid]
-            let energyFromCounters = rusage.map { Self.energyImpact(from: $0.energyNanojoules) } ?? 0
-            let energy = max(energyFromCounters, cpuPercent * 0.65 + memoryPercent * 0.35)
+            let counters = rusage.map(ProcessResourceCounters.init(rusage:))
+            if let counters {
+                resourceCounters[pid] = counters
+            }
+            let previousCounters = previousResourceCounters[pid]
+            let energy = Self.energyImpact(
+                cpuPercent: cpuPercent,
+                memoryPercent: memoryPercent,
+                counters: counters,
+                previousCounters: previousCounters,
+                elapsedSeconds: elapsedResourceSeconds
+            )
+            let diskReadRate = Self.byteRate(current: counters?.readBytes, previous: previousCounters?.readBytes, elapsedSeconds: elapsedResourceSeconds)
+            let diskWriteRate = Self.byteRate(current: counters?.writtenBytes, previous: previousCounters?.writtenBytes, elapsedSeconds: elapsedResourceSeconds)
+            let wakeupsRate = Self.countRate(current: counters?.wakeups, previous: previousCounters?.wakeups, elapsedSeconds: elapsedResourceSeconds)
             let hasVisibleWindows = visibleWindowPIDs.contains(pid) || Self.appearsWindowed(path: command, name: displayName, status: bsd.status)
 
             return ProcessSnapshot(
@@ -146,10 +176,10 @@ actor SystemMonitorSampler: MonitorSampling {
                 threadCount: task.threadCount,
                 portsCount: nil,
                 preventsSleep: sleepPreventingPIDs.isEmpty ? nil : sleepPreventingPIDs.contains(pid),
-                wakeups: rusage?.wakeups,
+                wakeups: counters == nil ? nil : wakeupsRate,
                 energyImpact: energy,
-                diskReadBytes: rusage?.readBytes ?? 0,
-                diskWriteBytes: rusage?.writtenBytes ?? 0,
+                diskReadBytes: diskReadRate,
+                diskWriteBytes: diskWriteRate,
                 networkReceivedBytes: network?.bytesIn ?? 0,
                 networkSentBytes: network?.bytesOut ?? 0,
                 hasVisibleWindows: hasVisibleWindows,
@@ -161,7 +191,7 @@ actor SystemMonitorSampler: MonitorSampling {
             lhs.cpuPercent == rhs.cpuPercent ? lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending : lhs.cpuPercent > rhs.cpuPercent
         }
 
-        return ProcessCapture(processes: processes, cpuTimes: cpuTimes)
+        return ProcessCapture(processes: processes, cpuTimes: cpuTimes, resourceCounters: resourceCounters)
     }
 
     private static func captureCPU(processes: [ProcessSnapshot], currentTicks: HostCPUTicks?, previousTicks: HostCPUTicks?) -> CPUSummary {
@@ -325,9 +355,66 @@ actor SystemMonitorSampler: MonitorSampling {
             searchable.localizedCaseInsensitiveContains("CoreAnimation")
     }
 
-    private static func energyImpact(from nanojoules: UInt64) -> Double {
-        guard nanojoules > 0 else { return 0 }
-        return min(999, log10(Double(nanojoules)))
+    static func energyImpact(
+        cpuPercent: Double,
+        memoryPercent: Double,
+        counters: ProcessResourceCounters?,
+        previousCounters: ProcessResourceCounters?,
+        elapsedSeconds: TimeInterval?
+    ) -> Double {
+        let cpuComponent = min(100, max(0, cpuPercent)) * 0.75
+        let memoryComponent = min(100, max(0, memoryPercent)) * 0.04
+        guard let counters,
+              let previousCounters,
+              let elapsedSeconds,
+              elapsedSeconds > 0
+        else {
+            return min(100, cpuComponent + memoryComponent)
+        }
+
+        let watts = Double(counters.energyNanojoules.saturatingSubtract(previousCounters.energyNanojoules)) / elapsedSeconds / 1_000_000_000
+        let wakeupsPerSecond = Double(max(0, counters.wakeups - previousCounters.wakeups)) / elapsedSeconds
+        let energyComponent = min(25, watts * 4)
+        let wakeupsComponent = min(25, wakeupsPerSecond / 250)
+        return min(100, cpuComponent + memoryComponent + energyComponent + wakeupsComponent)
+    }
+
+    private static func byteRate(current: Int64?, previous: Int64?, elapsedSeconds: TimeInterval?) -> Int64 {
+        countRate(current: current, previous: previous, elapsedSeconds: elapsedSeconds)
+    }
+
+    private static func countRate(current: Int64?, previous: Int64?, elapsedSeconds: TimeInterval?) -> Int64 {
+        guard let current,
+              let previous,
+              let elapsedSeconds,
+              elapsedSeconds > 0
+        else {
+            return 0
+        }
+        return Int64(max(0, (Double(current - previous) / elapsedSeconds).rounded()))
+    }
+}
+
+struct ProcessResourceCounters: Equatable, Sendable {
+    let readBytes: Int64
+    let writtenBytes: Int64
+    let energyNanojoules: UInt64
+    let wakeups: Int64
+
+    init(readBytes: Int64, writtenBytes: Int64, energyNanojoules: UInt64, wakeups: Int64) {
+        self.readBytes = readBytes
+        self.writtenBytes = writtenBytes
+        self.energyNanojoules = energyNanojoules
+        self.wakeups = wakeups
+    }
+
+    init(rusage: ProcessInfoSampler.Rusage) {
+        self.init(
+            readBytes: rusage.readBytes,
+            writtenBytes: rusage.writtenBytes,
+            energyNanojoules: rusage.energyNanojoules,
+            wakeups: rusage.wakeups
+        )
     }
 }
 

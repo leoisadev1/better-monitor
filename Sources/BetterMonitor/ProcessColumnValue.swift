@@ -16,11 +16,11 @@ enum ProcessColumnValue {
         case .energy:
             return String(format: "%.1f", process.energyImpact)
         case .disk:
-            return MonitorFormatting.bytes(process.diskReadBytes + process.diskWriteBytes)
+            return MonitorFormatting.rate(process.diskReadBytes + process.diskWriteBytes)
         case .diskRead:
-            return MonitorFormatting.bytes(process.diskReadBytes)
+            return MonitorFormatting.rate(process.diskReadBytes)
         case .diskWritten:
-            return MonitorFormatting.bytes(process.diskWriteBytes)
+            return MonitorFormatting.rate(process.diskWriteBytes)
         case .network:
             return MonitorFormatting.bytes(process.networkReceivedBytes + process.networkSentBytes)
         case .networkReceived:
