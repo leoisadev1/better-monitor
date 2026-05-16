@@ -2,7 +2,7 @@
 
 Better Monitor is a native macOS system monitor built with SwiftUI and AppKit. It is meant to feel familiar if you use Activity Monitor, while staying table-first, fast to launch, and lighter on the default refresh path.
 
-It is still an unsigned local build, not a notarized App Store app. The install script below builds it from source, ad-hoc signs it, installs it, and removes macOS quarantine from this app bundle so it opens normally.
+The easiest install path is the Homebrew cask below. Release builds are ad-hoc signed and the cask/installer removes quarantine from the installed app bundle so it opens normally. The app is not notarized yet, so Developer ID signing and notarization are still the next step for broader public distribution.
 
 ## Install
 
@@ -32,7 +32,7 @@ cd better-monitor
 scripts/install-better-monitor.sh
 ```
 
-That installs `Better Monitor.app` into `/Applications` and opens it.
+That builds from source, installs `Better Monitor.app` into `/Applications`, and opens it.
 
 If you do not want to use `sudo`, install into your user Applications folder:
 
@@ -159,6 +159,14 @@ Better Monitor avoids expensive work on the default refresh path:
 
 ## Uninstall
 
+If installed with Homebrew:
+
+```sh
+brew uninstall --cask better-monitor
+```
+
+If installed with the script:
+
 ```sh
 rm -rf "/Applications/Better Monitor.app"
 ```
@@ -171,4 +179,4 @@ rm -rf "$HOME/Applications/Better Monitor.app"
 
 ## Status
 
-This is a local developer build. It is ad-hoc signed and not notarized. For broad public distribution, the next real step is Developer ID signing and notarization so users do not need quarantine removal.
+Release builds are available through GitHub releases, the one-line installer, and the Homebrew cask. They are ad-hoc signed and not notarized. For broad public distribution, the next real step is Developer ID signing and notarization so users do not need quarantine removal.
