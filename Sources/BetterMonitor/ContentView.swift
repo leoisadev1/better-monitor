@@ -107,11 +107,11 @@ private struct PaneSidebar: View {
         case .memory:
             return MonitorFormatting.percent(store.snapshot.summary.memory.pressure * 100)
         case .energy:
-            return String(format: "%.1f", store.snapshot.summary.energy.totalImpact)
+            return String(format: "%.1f avg", store.snapshot.summary.energy.averageImpact)
         case .disk:
-            return MonitorFormatting.bytes(store.snapshot.summary.disk.readBytes + store.snapshot.summary.disk.writtenBytes)
+            return MonitorFormatting.rate(store.history.diskBytesPerSecond.last ?? 0)
         case .network:
-            return MonitorFormatting.bytes(store.snapshot.summary.network.bytesIn + store.snapshot.summary.network.bytesOut)
+            return MonitorFormatting.rate(store.history.networkBytesPerSecond.last ?? 0)
         case .cache:
             return store.snapshot.summary.cache.isAvailable ? "Available" : "Off"
         }
@@ -348,27 +348,25 @@ private struct SummaryStrip: View {
         case .energy:
             let energy = snapshot.summary.energy
             return [
-                MetricCardModel(title: "Energy Impact", value: String(format: "%.1f", energy.totalImpact), color: .yellow),
-                MetricCardModel(title: "Avg", value: String(format: "%.2f", energy.averageImpact), color: .secondary),
+                MetricCardModel(title: "Avg Impact", value: String(format: "%.2f", energy.averageImpact), color: .yellow),
                 MetricCardModel(title: "Power", value: energy.powerSource, color: .green),
                 MetricCardModel(title: "Battery", value: energy.batteryPercent.map { MonitorFormatting.percent($0) } ?? "N/A", color: .secondary),
-                MetricCardModel(title: "Preventing Sleep", value: "\(energy.preventingSleepCount)", color: .orange)
+                MetricCardModel(title: "Preventing Sleep", value: "\(energy.preventingSleepCount)", color: .orange),
+                MetricCardModel(title: "Processes", value: "\(snapshot.processes.count)", color: .secondary)
             ]
         case .disk:
-            let disk = snapshot.summary.disk
             return [
-                MetricCardModel(title: "Reads", value: MonitorFormatting.number(disk.reads), color: .blue),
-                MetricCardModel(title: "Writes", value: MonitorFormatting.number(disk.writes), color: .purple),
-                MetricCardModel(title: "Read", value: MonitorFormatting.bytes(disk.readBytes), color: .blue),
-                MetricCardModel(title: "Written", value: MonitorFormatting.bytes(disk.writtenBytes), color: .purple)
+                MetricCardModel(title: "Reads/s", value: MonitorFormatting.countRate(history.diskReadsPerSecond.last ?? 0), color: .blue),
+                MetricCardModel(title: "Writes/s", value: MonitorFormatting.countRate(history.diskWritesPerSecond.last ?? 0), color: .purple),
+                MetricCardModel(title: "Read/s", value: MonitorFormatting.rate(history.diskReadBytesPerSecond.last ?? 0), color: .blue),
+                MetricCardModel(title: "Written/s", value: MonitorFormatting.rate(history.diskWrittenBytesPerSecond.last ?? 0), color: .purple)
             ]
         case .network:
-            let network = snapshot.summary.network
             return [
-                MetricCardModel(title: "Packets In", value: MonitorFormatting.number(network.packetsIn), color: .blue),
-                MetricCardModel(title: "Packets Out", value: MonitorFormatting.number(network.packetsOut), color: .green),
-                MetricCardModel(title: "Data In", value: MonitorFormatting.bytes(network.bytesIn), color: .blue),
-                MetricCardModel(title: "Data Out", value: MonitorFormatting.bytes(network.bytesOut), color: .green)
+                MetricCardModel(title: "Packets In/s", value: MonitorFormatting.countRate(history.networkPacketsInPerSecond.last ?? 0), color: .blue),
+                MetricCardModel(title: "Packets Out/s", value: MonitorFormatting.countRate(history.networkPacketsOutPerSecond.last ?? 0), color: .green),
+                MetricCardModel(title: "Data In/s", value: MonitorFormatting.rate(history.networkBytesInPerSecond.last ?? 0), color: .blue),
+                MetricCardModel(title: "Data Out/s", value: MonitorFormatting.rate(history.networkBytesOutPerSecond.last ?? 0), color: .green)
             ]
         case .cache:
             let cache = snapshot.summary.cache

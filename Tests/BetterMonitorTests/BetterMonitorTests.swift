@@ -519,17 +519,17 @@ import Testing
     let first = MonitorSnapshot(capturedAt: Date(timeIntervalSince1970: 1), processes: [], summary: SystemSummary(
         cpu: CPUSummary(userPercent: 10, systemPercent: 5, idlePercent: 85, processCount: 1, threadCount: 1, loadAverage: []),
         memory: MemorySummary(physicalMemoryBytes: 100, usedBytes: 50, appBytes: 20, wiredBytes: 10, compressedBytes: 5, cachedBytes: 15, swapUsedBytes: 0, pressure: 0.5),
-        energy: EnergySummary(totalImpact: 3, averageImpact: 1, batteryPercent: nil, powerSource: "AC", preventingSleepCount: 0),
-        disk: DiskSummary(reads: 0, writes: 0, readBytes: 100, writtenBytes: 100),
-        network: NetworkSummary(packetsIn: 0, packetsOut: 0, bytesIn: 200, bytesOut: 100),
+        energy: EnergySummary(totalImpact: 300, averageImpact: 3, batteryPercent: nil, powerSource: "AC", preventingSleepCount: 0),
+        disk: DiskSummary(reads: 10, writes: 20, readBytes: 100, writtenBytes: 100),
+        network: NetworkSummary(packetsIn: 40, packetsOut: 60, bytesIn: 200, bytesOut: 100),
         cache: CacheSummary(isAvailable: true, isActive: true, servedBytes: 0, droppedBytes: 0, originBytes: 0, peerBytes: 0, pressure: 0.25)
     ))
     let second = MonitorSnapshot(capturedAt: Date(timeIntervalSince1970: 3), processes: [], summary: SystemSummary(
         cpu: CPUSummary(userPercent: 20, systemPercent: 10, idlePercent: 70, processCount: 1, threadCount: 1, loadAverage: []),
         memory: first.summary.memory,
         energy: first.summary.energy,
-        disk: DiskSummary(reads: 0, writes: 0, readBytes: 300, writtenBytes: 300),
-        network: NetworkSummary(packetsIn: 0, packetsOut: 0, bytesIn: 800, bytesOut: 500),
+        disk: DiskSummary(reads: 16, writes: 24, readBytes: 300, writtenBytes: 300),
+        network: NetworkSummary(packetsIn: 52, packetsOut: 66, bytesIn: 800, bytesOut: 500),
         cache: first.summary.cache
     ))
 
@@ -538,7 +538,16 @@ import Testing
     history.append(snapshot: second, previous: second, duration: 0.3, limit: 2)
 
     #expect(history.values(for: .cpu) == [30, 30])
+    #expect(history.values(for: .energy) == [3, 3])
+    #expect(history.diskReadsPerSecond == [3, 0])
+    #expect(history.diskWritesPerSecond == [2, 0])
+    #expect(history.diskReadBytesPerSecond == [100, 0])
+    #expect(history.diskWrittenBytesPerSecond == [100, 0])
     #expect(history.diskBytesPerSecond == [200, 0])
+    #expect(history.networkPacketsInPerSecond == [6, 0])
+    #expect(history.networkPacketsOutPerSecond == [3, 0])
+    #expect(history.networkBytesInPerSecond == [300, 0])
+    #expect(history.networkBytesOutPerSecond == [200, 0])
     #expect(history.networkBytesPerSecond == [500, 0])
     #expect(history.sampleDurations == [200, 300])
 }

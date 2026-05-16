@@ -487,7 +487,15 @@ struct MonitorHistory: Equatable {
     var cpuUser: [Double] = []
     var memoryPressure: [Double] = []
     var energyImpact: [Double] = []
+    var diskReadsPerSecond: [Double] = []
+    var diskWritesPerSecond: [Double] = []
+    var diskReadBytesPerSecond: [Double] = []
+    var diskWrittenBytesPerSecond: [Double] = []
     var diskBytesPerSecond: [Double] = []
+    var networkPacketsInPerSecond: [Double] = []
+    var networkPacketsOutPerSecond: [Double] = []
+    var networkBytesInPerSecond: [Double] = []
+    var networkBytesOutPerSecond: [Double] = []
     var networkBytesPerSecond: [Double] = []
     var cachePressure: [Double] = []
     var sampleDurations: [Double] = []
@@ -498,18 +506,41 @@ struct MonitorHistory: Equatable {
         cpuSystem.append(snapshot.summary.cpu.systemPercent)
         cpuUser.append(snapshot.summary.cpu.userPercent)
         memoryPressure.append(snapshot.summary.memory.pressure * 100)
-        energyImpact.append(snapshot.summary.energy.totalImpact)
+        energyImpact.append(snapshot.summary.energy.averageImpact)
         cachePressure.append(snapshot.summary.cache.pressure * 100)
         sampleDurations.append(duration * 1_000)
 
         let interval = previous.map { max(0.001, snapshot.capturedAt.timeIntervalSince($0.capturedAt)) } ?? 1
         if let previous {
-            let diskDelta = max(0, snapshot.summary.disk.readBytes + snapshot.summary.disk.writtenBytes - previous.summary.disk.readBytes - previous.summary.disk.writtenBytes)
-            let networkDelta = max(0, snapshot.summary.network.bytesIn + snapshot.summary.network.bytesOut - previous.summary.network.bytesIn - previous.summary.network.bytesOut)
-            diskBytesPerSecond.append(Double(diskDelta) / interval)
-            networkBytesPerSecond.append(Double(networkDelta) / interval)
+            let diskReadsDelta = max(0, snapshot.summary.disk.reads - previous.summary.disk.reads)
+            let diskWritesDelta = max(0, snapshot.summary.disk.writes - previous.summary.disk.writes)
+            let diskReadBytesDelta = max(0, snapshot.summary.disk.readBytes - previous.summary.disk.readBytes)
+            let diskWrittenBytesDelta = max(0, snapshot.summary.disk.writtenBytes - previous.summary.disk.writtenBytes)
+            let networkPacketsInDelta = max(0, snapshot.summary.network.packetsIn - previous.summary.network.packetsIn)
+            let networkPacketsOutDelta = max(0, snapshot.summary.network.packetsOut - previous.summary.network.packetsOut)
+            let networkBytesInDelta = max(0, snapshot.summary.network.bytesIn - previous.summary.network.bytesIn)
+            let networkBytesOutDelta = max(0, snapshot.summary.network.bytesOut - previous.summary.network.bytesOut)
+
+            diskReadsPerSecond.append(Double(diskReadsDelta) / interval)
+            diskWritesPerSecond.append(Double(diskWritesDelta) / interval)
+            diskReadBytesPerSecond.append(Double(diskReadBytesDelta) / interval)
+            diskWrittenBytesPerSecond.append(Double(diskWrittenBytesDelta) / interval)
+            diskBytesPerSecond.append(Double(diskReadBytesDelta + diskWrittenBytesDelta) / interval)
+            networkPacketsInPerSecond.append(Double(networkPacketsInDelta) / interval)
+            networkPacketsOutPerSecond.append(Double(networkPacketsOutDelta) / interval)
+            networkBytesInPerSecond.append(Double(networkBytesInDelta) / interval)
+            networkBytesOutPerSecond.append(Double(networkBytesOutDelta) / interval)
+            networkBytesPerSecond.append(Double(networkBytesInDelta + networkBytesOutDelta) / interval)
         } else {
+            diskReadsPerSecond.append(0)
+            diskWritesPerSecond.append(0)
+            diskReadBytesPerSecond.append(0)
+            diskWrittenBytesPerSecond.append(0)
             diskBytesPerSecond.append(0)
+            networkPacketsInPerSecond.append(0)
+            networkPacketsOutPerSecond.append(0)
+            networkBytesInPerSecond.append(0)
+            networkBytesOutPerSecond.append(0)
             networkBytesPerSecond.append(0)
         }
 
@@ -538,7 +569,15 @@ struct MonitorHistory: Equatable {
         cpuUser.trimToSuffix(limit)
         memoryPressure.trimToSuffix(limit)
         energyImpact.trimToSuffix(limit)
+        diskReadsPerSecond.trimToSuffix(limit)
+        diskWritesPerSecond.trimToSuffix(limit)
+        diskReadBytesPerSecond.trimToSuffix(limit)
+        diskWrittenBytesPerSecond.trimToSuffix(limit)
         diskBytesPerSecond.trimToSuffix(limit)
+        networkPacketsInPerSecond.trimToSuffix(limit)
+        networkPacketsOutPerSecond.trimToSuffix(limit)
+        networkBytesInPerSecond.trimToSuffix(limit)
+        networkBytesOutPerSecond.trimToSuffix(limit)
         networkBytesPerSecond.trimToSuffix(limit)
         cachePressure.trimToSuffix(limit)
         sampleDurations.trimToSuffix(limit)

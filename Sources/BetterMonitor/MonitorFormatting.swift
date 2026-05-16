@@ -22,6 +22,14 @@ enum MonitorFormatting {
         "\(bytes(value))/s"
     }
 
+    static func rate(_ value: Double) -> String {
+        rate(Int64(max(0, value.rounded())))
+    }
+
+    static func countRate(_ value: Double) -> String {
+        "\(number(Int64(max(0, value.rounded()))))/s"
+    }
+
     static func number(_ value: Int64) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal

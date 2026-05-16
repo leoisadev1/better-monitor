@@ -51,7 +51,7 @@ actor SystemMonitorSampler: MonitorSampling {
                 energy: Self.captureEnergy(processes: processCapture.processes, sleepPreventingPIDs: sleepPreventingPIDs),
                 disk: Self.captureDisk(processes: processCapture.processes, detailed: true),
                 network: Self.captureNetwork(),
-                cache: focusedPane == .cache ? Self.captureCache() : .empty
+                cache: Self.captureCache()
             )
         }.value
 
