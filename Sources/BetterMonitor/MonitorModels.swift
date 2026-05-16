@@ -439,35 +439,6 @@ struct ProcessSnapshot: Identifiable, Equatable {
         copy.hierarchyLevel = level
         return copy
     }
-
-    func mergingMetrics(from other: ProcessSnapshot, for pane: MonitorPane) -> ProcessSnapshot {
-        ProcessSnapshot(
-            pid: pid,
-            parentPID: parentPID,
-            user: user,
-            command: command,
-            name: name,
-            cpuPercent: pane == .cpu ? other.cpuPercent : cpuPercent,
-            memoryPercent: pane == .memory ? other.memoryPercent : memoryPercent,
-            residentMemoryBytes: pane == .memory ? other.residentMemoryBytes : residentMemoryBytes,
-            virtualMemoryBytes: pane == .memory ? other.virtualMemoryBytes : virtualMemoryBytes,
-            state: other.state,
-            cpuTime: pane == .cpu ? other.cpuTime : cpuTime,
-            threadCount: pane == .cpu ? other.threadCount : threadCount,
-            portsCount: portsCount,
-            preventsSleep: pane == .energy ? other.preventsSleep : preventsSleep,
-            wakeups: pane == .energy ? other.wakeups : wakeups,
-            energyImpact: pane == .energy ? other.energyImpact : energyImpact,
-            diskReadBytes: pane == .disk ? other.diskReadBytes : diskReadBytes,
-            diskWriteBytes: pane == .disk ? other.diskWriteBytes : diskWriteBytes,
-            networkReceivedBytes: pane == .network ? other.networkReceivedBytes : networkReceivedBytes,
-            networkSentBytes: pane == .network ? other.networkSentBytes : networkSentBytes,
-            hasVisibleWindows: other.hasVisibleWindows || hasVisibleWindows,
-            usesGPU: other.usesGPU || usesGPU,
-            launchDate: launchDate ?? other.launchDate,
-            hierarchyLevel: hierarchyLevel
-        )
-    }
 }
 
 struct MonitorSnapshot: Equatable {
@@ -608,25 +579,6 @@ struct SystemSummary: Equatable {
         network: .empty,
         cache: .empty
     )
-
-    func merging(_ other: SystemSummary, for pane: MonitorPane) -> SystemSummary {
-        var copy = self
-        switch pane {
-        case .cpu:
-            copy.cpu = other.cpu
-        case .memory:
-            copy.memory = other.memory
-        case .energy:
-            copy.energy = other.energy
-        case .disk:
-            copy.disk = other.disk
-        case .network:
-            copy.network = other.network
-        case .cache:
-            copy.cache = other.cache
-        }
-        return copy
-    }
 }
 
 struct CPUSummary: Equatable {

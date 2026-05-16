@@ -197,7 +197,6 @@ final class MonitorStore {
     var selectedScope: ProcessScope = .all {
         didSet {
             guard oldValue != selectedScope else { return }
-            prewarmedPanes.removeAll()
             scheduleFocusedRefresh()
         }
     }
@@ -231,8 +230,6 @@ final class MonitorStore {
     private let sampler: any MonitorSampling
     private var refreshTask: Task<Void, Never>?
     private var focusedRefreshTask: Task<Void, Never>?
-    private var prewarmTask: Task<Void, Never>?
-    private var prewarmedPanes = Set<MonitorPane>()
     private var sortPreferencesByPane: [MonitorPane: SortPreference] = [.cpu: SortPreference.default(for: .cpu)]
 
     init(sampler: any MonitorSampling = SystemMonitorSampler(), settings: MonitorSettings = MonitorSettings()) {
@@ -270,7 +267,6 @@ final class MonitorStore {
     func start() async {
         guard refreshTask == nil else { return }
         await refreshNow()
-        scheduleBackgroundPrewarm()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
@@ -292,7 +288,6 @@ final class MonitorStore {
         if next != snapshot {
             snapshot = next
         }
-        prewarmedPanes.insert(selectedPane)
         history.append(snapshot: next, previous: previous, duration: lastRefreshDuration)
         let processIDs = Set(snapshot.processes.map(\.pid))
         if selectedProcessID == nil || selectedProcessID.map({ !processIDs.contains($0) }) == true {
@@ -494,39 +489,7 @@ final class MonitorStore {
             try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled else { return }
             await self?.refreshNow()
-            self?.scheduleBackgroundPrewarm()
         }
-    }
-
-    private func scheduleBackgroundPrewarm() {
-        guard prewarmTask == nil else { return }
-        prewarmTask = Task { [weak self] in
-            await self?.prewarmPaneData()
-        }
-    }
-
-    private func prewarmPaneData() async {
-        defer { prewarmTask = nil }
-        for pane in MonitorPane.allCases where pane != selectedPane && !prewarmedPanes.contains(pane) {
-            if Task.isCancelled { return }
-            let next = await sampler.capture(focusedPane: pane, focusedScope: selectedScope)
-            mergePrewarmedSnapshot(next, for: pane)
-            prewarmedPanes.insert(pane)
-        }
-    }
-
-    private func mergePrewarmedSnapshot(_ next: MonitorSnapshot, for pane: MonitorPane) {
-        guard snapshot != .empty else {
-            snapshot = next
-            return
-        }
-        let incomingByPID = Dictionary(uniqueKeysWithValues: next.processes.map { ($0.pid, $0) })
-        snapshot.processes = snapshot.processes.map { process in
-            guard let incoming = incomingByPID[process.pid] else { return process }
-            return process.mergingMetrics(from: incoming, for: pane)
-        }
-        snapshot.summary = snapshot.summary.merging(next.summary, for: pane)
-        snapshot.capturedAt = max(snapshot.capturedAt, next.capturedAt)
     }
 
     private func compareOptional<T: Comparable>(_ lhs: T?, _ rhs: T?) -> ComparisonResult {

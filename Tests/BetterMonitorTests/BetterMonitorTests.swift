@@ -374,6 +374,21 @@ import Testing
 }
 
 @MainActor
+@Test func paneSwitchingDoesNotCaptureImmediately() async throws {
+    let sampler = CountingSampler(snapshot: .empty)
+    let store = MonitorStore(sampler: sampler)
+
+    await store.refreshNow()
+    store.selectedPane = .memory
+    store.selectedPane = .energy
+    store.selectedPane = .disk
+    try? await Task.sleep(for: .milliseconds(180))
+
+    #expect(await sampler.captureCount() == 1)
+    #expect(store.selectedPane == .disk)
+}
+
+@MainActor
 @Test func storeCanDisplayProcessHierarchy() async throws {
     let store = MonitorStore(sampler: FixtureSampler(snapshot: MonitorSnapshot(
         capturedAt: Date(),
@@ -667,6 +682,24 @@ private actor SequenceSampler: MonitorSampling {
         let snapshot = snapshots[min(index, snapshots.count - 1)]
         index += 1
         return snapshot
+    }
+}
+
+private actor CountingSampler: MonitorSampling {
+    private let snapshot: MonitorSnapshot
+    private var count = 0
+
+    init(snapshot: MonitorSnapshot) {
+        self.snapshot = snapshot
+    }
+
+    func capture(focusedPane: MonitorPane, focusedScope: ProcessScope) async -> MonitorSnapshot {
+        count += 1
+        return snapshot
+    }
+
+    func captureCount() -> Int {
+        count
     }
 }
 
