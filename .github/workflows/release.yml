@@ -86,3 +86,56 @@ jobs:
             "dist/appcast.xml" \
             --title "Better Monitor $VERSION" \
             --notes-file "dist/release-notes.md"
+
+      - name: Update Homebrew tap
+        env:
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+          TAG_NAME: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${TAP_GITHUB_TOKEN:-}" ]]; then
+            echo "TAP_GITHUB_TOKEN is not set; skipping tap update."
+            exit 0
+          fi
+          sha256="$(shasum -a 256 "dist/Better-Monitor-$VERSION.zip" | awk '{print $1}')"
+          git clone "https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/leoisadev1/homebrew-tap.git" /tmp/homebrew-tap
+          mkdir -p /tmp/homebrew-tap/Casks
+          cat > /tmp/homebrew-tap/Casks/better-monitor.rb <<RUBY
+          cask "better-monitor" do
+            version "$VERSION"
+            sha256 "$sha256"
+
+            url "https://github.com/leoisadev1/better-monitor/releases/download/v#{version}/Better-Monitor-#{version}.zip"
+            name "Better Monitor"
+            desc "Native macOS system monitor built with SwiftUI and AppKit"
+            homepage "https://github.com/leoisadev1/better-monitor"
+
+            depends_on macos: ">= :sonoma"
+
+            app "Better Monitor.app"
+
+            postflight do
+              system_command "/usr/bin/xattr",
+                             args: ["-dr", "com.apple.quarantine", "#{appdir}/Better Monitor.app"],
+                             sudo: false
+            end
+
+            zap trash: [
+              "~/Library/Application Support/Better Monitor",
+              "~/Library/Caches/dev.leo.better-monitor",
+              "~/Library/Preferences/dev.leo.better-monitor.plist",
+              "~/Library/Saved Application State/dev.leo.better-monitor.savedState",
+            ]
+          end
+          RUBY
+          cd /tmp/homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/better-monitor.rb
+          if git diff --cached --quiet; then
+            echo "Homebrew cask is already current."
+            exit 0
+          fi
+          git commit -m "Update better-monitor to $VERSION"
+          git push

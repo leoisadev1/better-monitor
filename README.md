@@ -6,6 +6,26 @@ It is still an unsigned local build, not a notarized App Store app. The install 
 
 ## Install
 
+With Homebrew:
+
+```sh
+brew install --cask leoisadev1/tap/better-monitor
+```
+
+With a one-line installer:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/leoisadev1/better-monitor/main/scripts/install-latest.sh | bash
+```
+
+Install without `sudo`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/leoisadev1/better-monitor/main/scripts/install-latest.sh | bash -s -- --user
+```
+
+Build from source:
+
 ```sh
 git clone https://github.com/leoisadev1/better-monitor.git
 cd better-monitor
@@ -88,6 +108,8 @@ Manual releases can be started from GitHub Actions with a specific version.
 
 The Sparkle public key is committed through the package script. The private key must stay secret and is expected in the GitHub repository secret named `SPARKLE_PRIVATE_KEY`.
 
+The Homebrew cask lives in `leoisadev1/homebrew-tap`. The release workflow updates it automatically when the `TAP_GITHUB_TOKEN` repository secret is set.
+
 To test release artifacts locally:
 
 ```sh
@@ -133,6 +155,7 @@ Better Monitor avoids expensive work on the default refresh path:
 - Swift 6.3 toolchain
 - GitHub CLI only if you want to publish or manage the repo from the terminal
 - `SPARKLE_PRIVATE_KEY` GitHub secret for automatic one-click update releases
+- `TAP_GITHUB_TOKEN` GitHub secret for automatic Homebrew tap updates
 
 ## Uninstall
 
