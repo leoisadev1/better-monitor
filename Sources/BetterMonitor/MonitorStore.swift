@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -272,7 +273,9 @@ final class MonitorStore {
                 guard let self else { return }
                 let interval = settings.refreshInterval.rawValue
                 try? await Task.sleep(for: .seconds(interval))
-                await refreshNow()
+                if NSApp.isActive {
+                    await refreshNow()
+                }
             }
         }
     }

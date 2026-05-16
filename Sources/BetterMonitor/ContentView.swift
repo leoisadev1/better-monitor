@@ -27,6 +27,9 @@ struct ContentView: View {
         .onChange(of: store.settings.dockIconMode) {
             store.updateDockIcon()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await store.refreshNow() }
+        }
         .alert(processActionAlertTitle, isPresented: processActionConfirmationBinding) {
             if let pending = store.pendingProcessAction {
                 Button(pending.action.confirmationButtonTitle, role: .destructive) {
