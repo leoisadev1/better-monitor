@@ -87,7 +87,6 @@ struct MonitorCommands: Commands {
                         store.selectedPane = pane
                     }
                     .keyboardShortcut(KeyEquivalent(pane.keyboardEquivalent), modifiers: [.command])
-                    .disabled(store.selectedPane == pane)
                 }
             }
 

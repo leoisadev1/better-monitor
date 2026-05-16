@@ -35,15 +35,23 @@ final class MonitorSettings {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let savedRefresh = defaults.object(forKey: Keys.refreshInterval) as? Double
+        let resolvedRefresh: RefreshInterval
         if defaults.bool(forKey: Keys.refreshIntervalV2Migrated) {
-            refreshInterval = savedRefresh.flatMap(RefreshInterval.init(rawValue:)) ?? .normal
+            resolvedRefresh = savedRefresh.flatMap(RefreshInterval.init(rawValue:)) ?? .normal
         } else if savedRefresh == 2 {
-            refreshInterval = .normal
+            resolvedRefresh = .normal
             defaults.set(RefreshInterval.normal.rawValue, forKey: Keys.refreshInterval)
             defaults.set(true, forKey: Keys.refreshIntervalV2Migrated)
         } else {
-            refreshInterval = savedRefresh.flatMap(RefreshInterval.init(rawValue:)) ?? .normal
+            resolvedRefresh = savedRefresh.flatMap(RefreshInterval.init(rawValue:)) ?? .normal
         }
+        if !defaults.bool(forKey: Keys.refreshIntervalV3Migrated), resolvedRefresh == .normal {
+            refreshInterval = .fast
+            defaults.set(RefreshInterval.fast.rawValue, forKey: Keys.refreshInterval)
+        } else {
+            refreshInterval = resolvedRefresh
+        }
+        defaults.set(true, forKey: Keys.refreshIntervalV3Migrated)
         dockIconMode = DockIconMode(rawValue: defaults.string(forKey: Keys.dockIconMode) ?? "") ?? .appIcon
         showPrivateAPINotice = defaults.object(forKey: Keys.showPrivateAPINotice) as? Bool ?? true
         launchWithAllProcesses = defaults.object(forKey: Keys.launchWithAllProcesses) as? Bool ?? true
@@ -159,6 +167,7 @@ final class MonitorSettings {
     private enum Keys {
         static let refreshInterval = "monitor.refreshInterval"
         static let refreshIntervalV2Migrated = "monitor.refreshIntervalV2Migrated"
+        static let refreshIntervalV3Migrated = "monitor.refreshIntervalV3Migrated"
         static let dockIconMode = "monitor.dockIconMode"
         static let showPrivateAPINotice = "monitor.showPrivateAPINotice"
         static let launchWithAllProcesses = "monitor.launchWithAllProcesses"
@@ -183,7 +192,6 @@ final class MonitorStore {
             guard oldValue != selectedPane else { return }
             saveSortPreference(for: oldValue)
             applySortPreference(for: selectedPane)
-            scheduleFocusedRefresh()
         }
     }
     var selectedScope: ProcessScope = .all {

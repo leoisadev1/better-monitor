@@ -201,24 +201,25 @@ actor SystemMonitorSampler: MonitorSampling {
                 compressedBytes: 0,
                 cachedBytes: 0,
                 swapUsedBytes: 0,
-                pressure: physical > 0 ? (Double(resident) / Double(physical)).clampedPercent : 0
+                pressure: physical > 0 ? min(1, Double(resident) / Double(physical)) : 0
             )
         }
         let vm = MachMemoryReader.read()
         let wired = vm?.wiredBytes ?? 0
         let compressed = vm?.compressedBytes ?? 0
         let cached = vm?.cachedBytes ?? 0
-        let used = min(physical, max(resident, vm?.usedBytes ?? resident + wired + compressed))
-        let pressure = physical > 0 ? Double(used) / Double(physical) : 0
+        let app = min(physical, vm?.appBytes ?? resident)
+        let used = min(physical, vm?.usedBytes ?? app + wired + compressed)
+        let pressure = vm?.pressure ?? (physical > 0 ? min(1, Double(used) / Double(physical)) : 0)
         return MemorySummary(
             physicalMemoryBytes: physical,
             usedBytes: used,
-            appBytes: resident,
+            appBytes: app,
             wiredBytes: wired,
             compressedBytes: compressed,
             cachedBytes: cached,
             swapUsedBytes: vm?.swapUsedBytes ?? 0,
-            pressure: pressure.clampedPercent
+            pressure: pressure
         )
     }
 
@@ -750,10 +751,12 @@ enum HostCPUReader {
 
 struct MachMemoryStats: Equatable {
     let usedBytes: Int64
+    let appBytes: Int64
     let wiredBytes: Int64
     let compressedBytes: Int64
     let cachedBytes: Int64
     let swapUsedBytes: Int64
+    let pressure: Double
 }
 
 enum MachMemoryReader {
@@ -777,13 +780,24 @@ enum MachMemoryReader {
         let inactive = UInt64(stats.inactive_count) * pageBytes
         let wired = UInt64(stats.wire_count) * pageBytes
         let compressed = UInt64(stats.compressor_page_count) * pageBytes
-        let cached = UInt64(stats.purgeable_count + stats.speculative_count) * pageBytes
+        let cached = inactive + UInt64(stats.purgeable_count + stats.speculative_count) * pageBytes
+        let swap = readSwapUsedBytes()
+        let physical = max(1, ProcessInfo.processInfo.physicalMemory)
+        let used = min(UInt64(physical), active + wired + compressed)
+        let pressure = min(
+            1,
+            (Double(compressed) / Double(physical) * 2.4)
+                + (Double(max(0, swap)) / Double(physical) * 1.8)
+                + (Double(wired) / Double(physical) * 0.35)
+        )
         return MachMemoryStats(
-            usedBytes: Int64(clamping: active + inactive + wired + compressed),
+            usedBytes: Int64(clamping: used),
+            appBytes: Int64(clamping: active),
             wiredBytes: Int64(clamping: wired),
             compressedBytes: Int64(clamping: compressed),
             cachedBytes: Int64(clamping: cached),
-            swapUsedBytes: readSwapUsedBytes()
+            swapUsedBytes: swap,
+            pressure: pressure
         )
     }
 

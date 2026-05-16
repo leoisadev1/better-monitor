@@ -82,6 +82,7 @@ private struct PaneSidebar: View {
                         PaneSidebarRow(
                             pane: pane,
                             value: sidebarValue(for: pane),
+                            shortcut: "⌘\(pane.keyboardEquivalent)",
                             isSelected: store.selectedPane == pane
                         )
                     }
@@ -105,7 +106,7 @@ private struct PaneSidebar: View {
             let cpu = store.snapshot.summary.cpu.userPercent + store.snapshot.summary.cpu.systemPercent
             return MonitorFormatting.percent(cpu)
         case .memory:
-            return MonitorFormatting.percent(store.snapshot.summary.memory.pressure * 100)
+            return "\(MonitorFormatting.bytes(store.snapshot.summary.memory.usedBytes)) used"
         case .energy:
             return String(format: "%.1f avg", store.snapshot.summary.energy.averageImpact)
         case .disk:
@@ -121,6 +122,7 @@ private struct PaneSidebar: View {
 private struct PaneSidebarRow: View {
     let pane: MonitorPane
     let value: String
+    let shortcut: String
     let isSelected: Bool
 
     var body: some View {
@@ -142,6 +144,11 @@ private struct PaneSidebarRow: View {
             }
 
             Spacer(minLength: 0)
+
+            Text(shortcut)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(isSelected ? Color.white.opacity(0.7) : Color.secondary.opacity(0.68))
+                .monospacedDigit()
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
@@ -339,11 +346,11 @@ private struct SummaryStrip: View {
         case .memory:
             let memory = snapshot.summary.memory
             return [
-                MetricCardModel(title: "Pressure", value: MonitorFormatting.percent(memory.pressure * 100), color: memory.pressure > 0.75 ? .red : .green),
+                MetricCardModel(title: "Pressure", value: memoryPressureLabel(memory.pressure), color: memoryPressureColor(memory.pressure)),
                 MetricCardModel(title: "Used", value: MonitorFormatting.bytes(memory.usedBytes), color: .blue),
                 MetricCardModel(title: "App Memory", value: MonitorFormatting.bytes(memory.appBytes), color: .purple),
                 MetricCardModel(title: "Wired", value: MonitorFormatting.bytes(memory.wiredBytes), color: .orange),
-                MetricCardModel(title: "Swap", value: MonitorFormatting.bytes(memory.swapUsedBytes), color: .secondary)
+                MetricCardModel(title: "Compressed", value: MonitorFormatting.bytes(memory.compressedBytes), color: .yellow)
             ]
         case .energy:
             let energy = snapshot.summary.energy
@@ -394,6 +401,28 @@ private struct SummaryStrip: View {
     private var graphValues: [Double] {
         let values = history.values(for: selectedPane)
         return values.isEmpty ? [0, 0, 0] : values
+    }
+}
+
+private func memoryPressureColor(_ pressure: Double) -> Color {
+    switch pressure {
+    case 0.7...:
+        .red
+    case 0.4..<0.7:
+        .orange
+    default:
+        .green
+    }
+}
+
+private func memoryPressureLabel(_ pressure: Double) -> String {
+    switch pressure {
+    case 0.7...:
+        "High"
+    case 0.4..<0.7:
+        "Medium"
+    default:
+        "Low"
     }
 }
 

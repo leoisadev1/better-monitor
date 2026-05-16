@@ -69,10 +69,13 @@ import Testing
     let stats = try #require(MachMemoryReader.read())
 
     #expect(stats.usedBytes > 0)
+    #expect(stats.appBytes >= 0)
     #expect(stats.wiredBytes > 0)
     #expect(stats.compressedBytes >= 0)
     #expect(stats.cachedBytes >= 0)
     #expect(stats.swapUsedBytes >= 0)
+    #expect(stats.pressure >= 0)
+    #expect(stats.pressure <= 1)
 }
 
 @Test func networkInterfaceReaderCapturesNetworkCountersWithoutShellingOut() async throws {
@@ -631,8 +634,8 @@ import Testing
 
     let settings = MonitorSettings(defaults: defaults)
 
-    #expect(settings.refreshInterval == .normal)
-    #expect(defaults.double(forKey: "monitor.refreshInterval") == RefreshInterval.normal.rawValue)
+    #expect(settings.refreshInterval == .fast)
+    #expect(defaults.double(forKey: "monitor.refreshInterval") == RefreshInterval.fast.rawValue)
 }
 
 private struct FixtureSampler: MonitorSampling {
