@@ -57,6 +57,11 @@ jobs:
         run: swift test
 
       - name: Probe sampler budget
+        env:
+          # GitHub-hosted macOS runners have noisy cold proc/sysctl timings.
+          # Keep the local default gate strict; give CI enough headroom to avoid
+          # failing healthy releases on runner variance.
+          MAX_AVG_MS: 400
         run: scripts/probe-sampler.sh
 
       - name: Build release artifacts
