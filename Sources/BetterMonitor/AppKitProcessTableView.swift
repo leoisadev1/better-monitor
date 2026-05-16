@@ -181,7 +181,11 @@ struct AppKitProcessTableView: NSViewRepresentable {
             cell.textField?.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
             if column == .name {
                 cell.textField?.font = .systemFont(ofSize: 12)
-                cell.imageView?.image = ProcessIconProvider.icon(for: processes[row])
+                let pid = processes[row].pid
+                if cell.objectValue as? Int32 != pid {
+                    cell.imageView?.image = ProcessIconProvider.icon(for: processes[row])
+                    cell.objectValue = pid
+                }
             }
             return cell
         }
