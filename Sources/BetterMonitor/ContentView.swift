@@ -257,6 +257,12 @@ private struct MonitorToolbar: View {
                 .labelStyle(.iconOnly)
                 .help("Refresh Now")
                 .disabled(store.isRefreshing)
+
+                SettingsLink {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .labelStyle(.iconOnly)
+                .help("Settings")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
@@ -356,12 +362,11 @@ private struct SummaryStrip: View {
                 MetricCardModel(title: "Compressed", value: MonitorFormatting.bytes(memory.compressedBytes), color: .yellow)
             ]
         case .energy:
-            let energy = snapshot.summary.energy
             return [
-                MetricCardModel(title: "Avg Impact", value: String(format: "%.2f", energy.averageImpact), color: .yellow),
-                MetricCardModel(title: "Power", value: energy.powerSource, color: .green),
-                MetricCardModel(title: "Battery", value: energy.batteryPercent.map { MonitorFormatting.percent($0) } ?? "N/A", color: .secondary),
-                MetricCardModel(title: "Preventing Sleep", value: "\(energy.preventingSleepCount)", color: .orange),
+                MetricCardModel(title: "Active Avg", value: String(format: "%.2f", snapshot.summary.energy.averageImpact), color: .yellow),
+                MetricCardModel(title: "Power", value: snapshot.summary.energy.powerSource, color: .green),
+                MetricCardModel(title: "Battery", value: snapshot.summary.energy.batteryPercent.map { MonitorFormatting.percent($0) } ?? "N/A", color: .secondary),
+                MetricCardModel(title: "Preventing Sleep", value: "\(snapshot.summary.energy.preventingSleepCount)", color: .orange),
                 MetricCardModel(title: "Processes", value: "\(snapshot.processes.count)", color: .secondary)
             ]
         case .disk:
@@ -682,9 +687,31 @@ private struct StatusBar: View {
 
 struct SettingsView: View {
     @Bindable var settings: MonitorSettings
+    @ObservedObject var updater: AppUpdater
     @State private var selectedPane: MonitorPane = .cpu
 
     var body: some View {
+        TabView {
+            generalSettings
+                .tabItem {
+                    Label("General", systemImage: "slider.horizontal.3")
+                }
+
+            updateSettings
+                .tabItem {
+                    Label("Updates", systemImage: "arrow.down.circle")
+                }
+
+            columnSettings
+                .tabItem {
+                    Label("Columns", systemImage: "rectangle.grid.1x2")
+                }
+        }
+        .scenePadding()
+        .frame(width: 560, height: 520)
+    }
+
+    private var generalSettings: some View {
         Form {
             Picker("Update Frequency", selection: $settings.refreshInterval) {
                 ForEach(RefreshInterval.allCases) { interval in
@@ -700,28 +727,113 @@ struct SettingsView: View {
 
             Toggle("Show private API parity notice", isOn: $settings.showPrivateAPINotice)
             Toggle("Launch showing all processes", isOn: $settings.launchWithAllProcesses)
+        }
+        .formStyle(.grouped)
+        .padding(20)
+    }
 
-            Section("Columns") {
-                Picker("Pane", selection: $selectedPane) {
+    private var updateSettings: some View {
+        Form {
+            Toggle("Automatically check for updates", isOn: Binding(
+                get: { updater.automaticallyChecksForUpdates },
+                set: { updater.automaticallyChecksForUpdates = $0 }
+            ))
+
+            Toggle("Automatically download and install updates", isOn: Binding(
+                get: { updater.automaticallyDownloadsUpdates },
+                set: { updater.automaticallyDownloadsUpdates = $0 }
+            ))
+            .disabled(!updater.automaticallyChecksForUpdates || !updater.allowsAutomaticUpdates)
+
+            Button("Check for Updates Now") {
+                updater.checkForUpdates()
+            }
+        }
+        .formStyle(.grouped)
+        .padding(20)
+    }
+
+    private var columnSettings: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Pane")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                     ForEach(MonitorPane.allCases) { pane in
-                        Text(pane.title).tag(pane)
+                        SettingsPaneButton(
+                            pane: pane,
+                            isSelected: selectedPane == pane
+                        ) {
+                            selectedPane = pane
+                        }
                     }
                 }
+            }
 
-                ForEach(ProcessColumn.allCases) { column in
-                    Toggle(column.label, isOn: Binding(
-                        get: { settings.isColumnVisible(column, pane: selectedPane) },
-                        set: { settings.setColumn(column, isVisible: $0, pane: selectedPane) }
-                    ))
-                    .disabled(column == .name)
-                }
-
-                Button("Reset Columns for \(selectedPane.title)") {
+            HStack {
+                Text("Visible Columns")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Reset Columns") {
                     settings.resetColumns(for: selectedPane)
                 }
+                .controlSize(.small)
+            }
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 9) {
+                    ForEach(ProcessColumn.allCases) { column in
+                        Toggle(column.label, isOn: Binding(
+                            get: { settings.isColumnVisible(column, pane: selectedPane) },
+                            set: { settings.setColumn(column, isVisible: $0, pane: selectedPane) }
+                        ))
+                        .disabled(column == .name)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(.vertical, 2)
+                .padding(.trailing, 8)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .textBackgroundColor).opacity(0.35), in: .rect(cornerRadius: 8))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
             }
         }
         .padding(20)
-        .frame(width: 420, height: 520)
+    }
+}
+
+private struct SettingsPaneButton: View {
+    let pane: MonitorPane
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: pane.systemImage)
+                    .frame(width: 16)
+                Text(pane.title)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .background(isSelected ? Color.accentColor : Color(nsColor: .controlBackgroundColor), in: .rect(cornerRadius: 7))
+            .overlay {
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: isSelected ? 0 : 0.5)
+            }
+        }
+        .buttonStyle(.plain)
+        .help("Configure \(pane.title) columns")
     }
 }

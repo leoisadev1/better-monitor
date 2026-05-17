@@ -557,6 +557,19 @@ import Testing
     #expect(snapshot.summary.energy.averageImpact <= 100)
 }
 
+@Test func energyAverageIgnoresIdleZeroImpactRows() async throws {
+    let processes = [
+        ProcessSnapshot.fixture(pid: 1, user: "leo", name: "Idle A", cpu: 0),
+        ProcessSnapshot.fixture(pid: 2, user: "leo", name: "Idle B", cpu: 0),
+        ProcessSnapshot.fixture(pid: 3, user: "leo", name: "Active A", cpu: 8),
+        ProcessSnapshot.fixture(pid: 4, user: "leo", name: "Active B", cpu: 4)
+    ]
+
+    let average = SystemMonitorSampler.activeAverageEnergyImpact(for: processes)
+
+    #expect(average == 6)
+}
+
 @Test func hostCPUReaderComputesDeltaPercentages() async throws {
     let previous = HostCPUTicks(user: 100, system: 50, idle: 850, nice: 0)
     let current = HostCPUTicks(user: 130, system: 70, idle: 950, nice: 0)

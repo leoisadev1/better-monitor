@@ -79,6 +79,10 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
     <true/>
     <key>SUFeedURL</key>
     <string>$SPARKLE_FEED_URL</string>
+    <key>SUEnableAutomaticChecks</key>
+    <false/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
 PLIST
 
 if [[ -n "$SPARKLE_PUBLIC_ED_KEY" ]]; then

@@ -54,7 +54,7 @@ xattr -dr com.apple.quarantine "$HOME/Applications/Better Monitor.app"
 open "$HOME/Applications/Better Monitor.app"
 ```
 
-After the app is installed from a GitHub release, future releases can be installed from **Better Monitor > Check for Updates...**. The updater uses Sparkle and the signed `appcast.xml` asset attached to the latest GitHub release.
+After the app is installed from a GitHub release, future releases can be installed from **Better Monitor > Check for Updates...**. The updater uses Sparkle and the signed `appcast.xml` asset attached to the latest GitHub release. Automatic update checks are off by default so first launch stays quiet; users can enable automatic checks and automatic install from **Settings > Updates**.
 
 ## What It Does
 

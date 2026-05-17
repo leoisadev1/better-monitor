@@ -35,6 +35,12 @@ ditto -c -k --keepParent "$APP_DIR" "$ZIP_PATH"
     echo
     echo "Built from commit ${GITHUB_SHA:-$(git rev-parse --short HEAD 2>/dev/null || echo local)}."
     echo
+    previous_tag="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+    if [[ -n "$previous_tag" ]]; then
+        echo "## Changes since $previous_tag"
+        git log --no-merges --format='- %s (%h)' "$previous_tag..HEAD" 2>/dev/null || true
+        echo
+    fi
     echo "Download the zip, unzip it, and move Better Monitor.app to Applications."
 } > "$RELEASE_NOTES_PATH"
 

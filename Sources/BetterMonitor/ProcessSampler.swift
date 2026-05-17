@@ -255,12 +255,18 @@ actor SystemMonitorSampler: MonitorSampling {
 
     private static func captureEnergy(processes: [ProcessSnapshot], sleepPreventingPIDs: Set<Int32>) -> EnergySummary {
         let totalImpact = processes.reduce(0) { $0 + $1.energyImpact }
-        let averageImpact = processes.isEmpty ? 0 : totalImpact / Double(processes.count)
+        let averageImpact = activeAverageEnergyImpact(for: processes)
         let power = PowerSourceReader.read()
         let fallbackPower = power == nil ? ((try? Shell.run("/usr/bin/pmset", ["-g", "batt"]).output) ?? "") : ""
         let battery = power?.batteryPercent ?? BatteryParser.parsePercent(fallbackPower)
         let source = power?.source ?? (fallbackPower.contains("AC Power") ? "Power Adapter" : fallbackPower.contains("Battery Power") ? "Battery" : "Unknown")
         return EnergySummary(totalImpact: totalImpact, averageImpact: averageImpact, batteryPercent: battery, powerSource: source, preventingSleepCount: sleepPreventingPIDs.count)
+    }
+
+    static func activeAverageEnergyImpact(for processes: [ProcessSnapshot]) -> Double {
+        let activeImpacts = processes.map(\.energyImpact).filter { $0 >= 0.05 }
+        guard !activeImpacts.isEmpty else { return 0 }
+        return activeImpacts.reduce(0, +) / Double(activeImpacts.count)
     }
 
     private static func captureDisk(processes: [ProcessSnapshot], detailed: Bool) -> DiskSummary {

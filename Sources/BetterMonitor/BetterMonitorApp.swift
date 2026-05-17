@@ -39,7 +39,7 @@ struct BetterMonitorApp: App {
         }
 
         Settings {
-            SettingsView(settings: store.settings)
+            SettingsView(settings: store.settings, updater: updater)
         }
     }
 }
